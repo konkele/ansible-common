@@ -1,0 +1,5 @@
+---
+- name: Apply netplan
+  command: netplan apply
+  become: yes
+  listen: Apply netplan

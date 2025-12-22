@@ -1,0 +1,24 @@
+---
+- name: Manage ACME DNS credentials if enabled and API key is defined
+  block:
+    - name: Ensure ACME credentials directory exists
+      file:
+        path: "{{ common_acme_credentials_file | dirname }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Create ACME DNS credentials file
+      copy:
+        dest: "{{ common_acme_credentials_file }}"
+        owner: root
+        group: root
+        mode: "0600"
+        content: |
+          dns_{{ common_acme_provider }}_api_token = {{ common_acme_api_key }}
+      no_log: true
+  when:
+    - common_acme_enabled | bool
+    - common_acme_api_key is defined
+    - common_acme_api_key | length > 0

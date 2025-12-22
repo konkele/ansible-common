@@ -1,0 +1,77 @@
+---
+- name: Ensure mount points exist
+  file:
+    path: "{{ item.mount_point }}"
+    state: directory
+  loop: "{{ common_local_disks }}"
+  loop_control:
+    label: "{{ item.mount_point }}"
+
+- name: Determine partition suffix for each disk
+  set_fact:
+    partition_suffixes: >-
+      {{
+        partition_suffixes | default({}) |
+        combine({ item.device: ('p1' if 'nvme' in item.device else '1') })
+      }}
+  loop: "{{ common_local_disks }}"
+  loop_control:
+    label: "{{ item.device }}"
+
+- name: Check if partition exists
+  stat:
+    path: "{{ item.device }}{{ partition_suffixes[item.device] }}"
+  register: partition_stats
+  loop: "{{ common_local_disks }}"
+  loop_control:
+    label: "{{ item.device }}"
+
+- name: Create partition if missing
+  community.general.parted:
+    device: "{{ item.device }}"
+    number: 1
+    part_type: primary
+    state: present
+    unit: MiB
+    part_start: 0%
+    part_end: 100%
+  when: >
+    partition_stats.results
+    | selectattr('item.device', 'equalto', item.device)
+    | map(attribute='stat.exists')
+    | first
+    | bool == false
+  loop: "{{ common_local_disks }}"
+  loop_control:
+    label: "{{ item.device }}"
+
+- name: Create filesystem if missing
+  filesystem:
+    dev: "{{ item.device }}{{ partition_suffixes[item.device] }}"
+    fstype: "{{ item.fstype | default('ext4') }}"
+    force: no
+  loop: "{{ common_local_disks }}"
+  loop_control:
+    label: "{{ item.device }}{{ partition_suffixes[item.device] }}"
+
+- name: Mount partition and update fstab
+  mount:
+    path: "{{ item.mount_point }}"
+    src: "{{ item.device }}{{ partition_suffixes[item.device] }}"
+    fstype: "{{ item.fstype | default('ext4') }}"
+    opts: "{{ item.mount_opts | default('defaults') }}"
+    state: "{{ item.state | default('mounted') }}"
+  loop: "{{ common_local_disks }}"
+  loop_control:
+    label: "{{ item.mount_point }}"
+
+- name: Ensure mount point ownership and mode after mount
+  file:
+    path: "{{ item.mount_point }}"
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mount_mode | default('0755') }}"
+    state: directory
+  loop: "{{ common_local_disks }}"
+  loop_control:
+    label: "{{ item.mount_point }}"

@@ -1,0 +1,154 @@
+---
+- name: Prevent defining common_users directly
+  assert:
+    that:
+      - common_users is not defined
+    fail_msg: >
+      Do not define 'common_users' in inventory.
+      Use common_users_global, common_users_group, or common_users_host.
+
+- name: Merge and deduplicate users from all scopes
+  set_fact:
+    merged_common_users: >-
+      {{
+        (
+          common_users_global +
+          common_users_group +
+          common_users_host
+        )
+        | reverse
+        | unique(attribute='name')
+        | reverse
+      }}
+
+- name: Ensure user exists
+  user:
+    name: "{{ user.name }}"
+    uid: "{{ user.uid | default(omit) }}"
+    shell: "{{ user.shell | default(user.system | default(false) | ternary('/usr/sbin/nologin','/bin/bash')) }}"
+    home: "{{ user.home | default(omit) }}"
+    create_home: "{{ user.home is defined }}"
+    system: "{{ user.system | default(user.home is not defined) }}"
+    state: present
+  loop: "{{ merged_common_users }}"
+  loop_control:
+    loop_var: user
+    label: "{{ user.name }}"
+
+- name: Ensure group exists with same GID as UID
+  group:
+    name: "{{ user.name }}"
+    gid: "{{ user.uid | default(omit) }}"
+    state: present
+    force: yes
+  loop: "{{ merged_common_users }}"
+  loop_control:
+    loop_var: user
+    label: "{{ user.name }}"
+
+- name: Configure sudo privileges
+  copy:
+    dest: "/etc/sudoers.d/{{ user.name }}"
+    content: "{{ user.name }} ALL=(ALL) NOPASSWD:ALL"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: 'visudo -cf %s'
+  when: user.sudo | default(false)
+  loop: "{{ merged_common_users }}"
+  loop_control:
+    loop_var: user
+    label: "{{ user.name }}"
+
+- name: Ensure .ssh directory exists
+  file:
+    path: "{{ user.home }}/.ssh"
+    state: directory
+    owner: "{{ user.name }}"
+    group: "{{ user.name }}"
+    mode: "0700"
+  when: user.home is defined and (user.authorized_keys | default([]) | length > 0)
+  loop: "{{ merged_common_users }}"
+  loop_control:
+    loop_var: user
+    label: "{{ user.name }}"
+
+- name: Set authorized keys
+  authorized_key:
+    user: "{{ user.name }}"
+    key: "{{ key }}"
+    state: present
+    exclusive: "{{ user.authorized_keys_exclusive | default(true) }}"
+  loop: "{{ merged_common_users | subelements('authorized_keys', skip_missing=True) }}"
+  loop_control:
+    loop_var: pair
+    label: "{{ pair.0.name }}:{{ pair.1 }}"
+  vars:
+    user: "{{ pair.0 }}"
+    key: "{{ pair.1 }}"
+  no_log: true
+
+- name: Get UID/GID from OS for each user
+  getent:
+    database: passwd
+    key: "{{ item.name }}"
+  register: user_info
+  loop: "{{ merged_common_users }}"
+  loop_control:
+    loop_var: item
+  no_log: true
+
+- name: Initialize updated user list
+  set_fact:
+    updated_users: []
+
+- name: Append updated user info
+  set_fact:
+    updated_users: "{{ updated_users + [ updated_user ] }}"
+  vars:
+    passwd_entry: >-
+      {{
+        (
+          user_info.results
+          | selectattr('item.name','equalto',item.name)
+          | map(attribute='ansible_facts.getent_passwd')
+          | first
+        )[item.name] | default([])
+      }}
+    updated_user:
+      name: "{{ item.name }}"
+      uid: "{{ passwd_entry[1] | default(item.uid | default('')) }}"
+      gid: "{{ passwd_entry[2] | default(item.gid | default('')) }}"
+      home: "{{ item.home | default('') }}"
+      shell: "{{ item.shell | default(item.system | default(false) | ternary('/usr/sbin/nologin','/bin/bash')) }}"
+      sudo: "{{ item.sudo | default(false) }}"
+      authorized_keys: "{{ item.authorized_keys | default([]) }}"
+      authorized_keys_exclusive: "{{ item.authorized_keys_exclusive | default(true) }}"
+      system: "{{ item.system | default(false) }}"
+      tags: "{{ item.tags | default([]) }}"
+  loop: "{{ merged_common_users }}"
+  loop_control:
+    loop_var: item
+  no_log: true
+
+- name: Replace merged_common_users with updated list
+  set_fact:
+    merged_common_users: "{{ updated_users }}"
+
+- name: Ensure /etc/ansible directory exists
+  file:
+    path: /etc/ansible
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Persist common user metadata
+  template:
+    src: common_users.yml.j2
+    dest: /etc/ansible/common_users.yml
+    owner: root
+    group: root
+    mode: "0600"
+  vars:
+    common_users: "{{ merged_common_users }}"

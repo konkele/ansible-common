@@ -1,0 +1,32 @@
+---
+# Users
+common_users_global: []
+common_users_group: []
+common_users_host: []
+
+# Timezone
+common_timezone: "America/Chicago"
+
+# DNS search suffixes
+common_dns_search: []
+
+# Firewall
+common_firewall_rules:
+  tcp:
+    - 22  # SSH
+  udp: []
+common_firewall_extra_tcp_ports: []
+common_firewall_extra_udp_ports: []
+
+# NFS mounts
+common_nfs_mounts: []
+
+# Local disks
+common_local_disks: []
+
+# ACME / DNS provider configuration
+common_acme_enabled: false          # Only deploy credentials file if true
+common_acme_provider: cloudflare
+common_acme_api_key: ""
+common_acme_credentials_file: "/etc/letsencrypt/{{ common_acme_provider }}.ini"
+common_acme_email: ""

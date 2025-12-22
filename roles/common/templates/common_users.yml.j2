@@ -1,0 +1,21 @@
+
+# /etc/ansible/common_users.yml
+common_users:
+{% for user in common_users %}
+  - name: "{{ user.name }}"
+    uid: {{ user.uid | default('') }}
+    gid: {{ user.gid | default('') }}
+    home: "{{ user.home | default('') }}"
+    shell: "{{ user.shell | default('/bin/bash') }}"
+    sudo: {{ user.sudo | default(false) }}
+    authorized_keys:
+{% for key in user.authorized_keys | default([]) %}
+      - "{{ key }}"
+{% endfor %}
+    authorized_keys_exclusive: {{ user.authorized_keys_exclusive | default(true) }}
+    system: {{ user.system | default(false) }}
+    tags:
+{% for tag in user.tags | default([]) %}
+      - "{{ tag }}"
+{% endfor %}
+{% endfor %}
