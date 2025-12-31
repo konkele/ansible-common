@@ -11,10 +11,6 @@
   import_tasks: dns.yml
   tags: dns
 
-- name: Configure firewall
-  import_tasks: firewall.yml
-  tags: firewall
-
 - name: Configure NFS mounts
   import_tasks: nfs.yml
   tags: nfs
@@ -22,10 +18,6 @@
 - name: Configure local disks
   import_tasks: disks.yml
   tags: disks
-
-- name: Configure ACME DNS credentials
-  import_tasks: acme_dns.yml
-  tags: acme
 
 - name: Update packages and reboot if needed
   import_tasks: update.yml

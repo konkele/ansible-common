@@ -1,0 +1,128 @@
+---
+- name: Check if mount point exists
+  ansible.builtin.stat:
+    path: "{{ item.mount_point }}"
+  register: mountpoint_stat
+  loop: "{{ common_local_disks }}"
+  loop_control:
+    label: "{{ item.device }}"
+
+- name: Check if device exists
+  ansible.builtin.stat:
+    path: "{{ item.device }}"
+  register: device_stat
+  loop: "{{ common_local_disks }}"
+  loop_control:
+    label: "{{ item.device }}"
+
+- name: Ensure mount point directory exists (only if not mounted yet)
+  ansible.builtin.file:
+    path: "{{ item.mount_point }}"
+    state: directory
+    mode: "{{ item.mount_mode | default('0755') }}"
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+  when:
+    - item.state != 'absent'
+    - not (mountpoint_stat.results | selectattr('item.device', 'equalto', item.device) | first).stat.exists
+  loop: "{{ common_local_disks }}"
+  loop_control:
+    label: "{{ item.device }}"
+
+- name: Check if device is already formatted
+  ansible.builtin.command: "blkid -o value -s TYPE {{ item.device }}"
+  register: blkid_output
+  failed_when: false
+  changed_when: false
+  when:
+    - (device_stat.results | selectattr('item.device', 'equalto', item.device) | first).stat.exists
+    - item.state != 'absent'
+  loop: "{{ common_local_disks }}"
+  loop_control:
+    label: "{{ item.device }}"
+
+- name: Format the disk if not formatted
+  ansible.builtin.filesystem:
+    fstype: "{{ item.fs_type }}"
+    dev: "{{ item.device }}"
+    force: no
+  when:
+    - (device_stat.results | selectattr('item.device', 'equalto', item.device) | first).stat.exists
+    - item.state != 'absent'
+    - (blkid_output.results | selectattr('item.device', 'equalto', item.device) | first).stdout == ""
+  loop: "{{ common_local_disks }}"
+  loop_control:
+    label: "{{ item.device }}"
+
+- name: Get UUID of the device
+  ansible.builtin.command: "blkid -s UUID -o value {{ item.device }}"
+  register: disk_uuid
+  changed_when: false
+  when:
+    - (device_stat.results | selectattr('item.device', 'equalto', item.device) | first).stat.exists
+    - item.state != 'absent'
+  loop: "{{ common_local_disks }}"
+  loop_control:
+    label: "{{ item.device }}"
+
+- name: Add entry to /etc/fstab
+  ansible.builtin.mount:
+    path: "{{ item.mount_point }}"
+    src: "UUID={{ (disk_uuid.results | selectattr('item.device', 'equalto', item.device) | first).stdout }}"
+    fstype: "{{ item.fs_type }}"
+    opts: "{{ item.mount_opts | default('defaults') }}"
+    state: present
+    backup: yes
+  when:
+    - (device_stat.results | selectattr('item.device', 'equalto', item.device) | first).stat.exists
+    - item.state != 'absent'
+  loop: "{{ common_local_disks }}"
+  loop_control:
+    label: "{{ item.device }}"
+
+- name: Mount the filesystem
+  ansible.builtin.mount:
+    path: "{{ item.mount_point }}"
+    src: "UUID={{ (disk_uuid.results | selectattr('item.device', 'equalto', item.device) | first).stdout }}"
+    fstype: "{{ item.fs_type }}"
+    opts: "{{ item.mount_opts | default('defaults') }}"
+    state: mounted
+  when:
+    - (device_stat.results | selectattr('item.device', 'equalto', item.device) | first).stat.exists
+    - item.state == 'mounted'
+  loop: "{{ common_local_disks }}"
+  loop_control:
+    label: "{{ item.device }}"
+
+- name: Unmount filesystem if mount point exists
+  ansible.builtin.command: "umount {{ item.mount_point }}"
+  when:
+    - item.state == 'absent'
+    - (mountpoint_stat.results | selectattr('item.device', 'equalto', item.device) | first).stat.exists
+  loop: "{{ common_local_disks }}"
+  loop_control:
+    label: "{{ item.device }}"
+  ignore_errors: true  # Skip if already unmounted
+
+- name: Remove fstab entry for mount point (safe)
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: "^UUID=.*\\s{{ item.mount_point }}\\s"
+    state: absent
+    backup: yes
+  when: item.state == 'absent'
+  loop: "{{ common_local_disks }}"
+  loop_control:
+    label: "{{ item.device }}"
+
+- name: Purge mount point directory if requested
+  ansible.builtin.file:
+    path: "{{ item.mount_point }}"
+    state: absent
+    force: true
+  when:
+    - item.state == 'absent'
+    - item.purge | default(false) | bool
+  loop: "{{ common_local_disks }}"
+  loop_control:
+    label: "{{ item.device }}"

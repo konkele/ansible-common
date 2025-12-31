@@ -1,11 +1,12 @@
+---
 galaxy_info:
   role_name: common
   namespace: konkele
   author: Eric Konkel
   description: >-
     Baseline system configuration role providing deterministic user management,
-    networking defaults, firewall rules, storage configuration, and shared
-    metadata for downstream Ansible roles.
+    networking defaults, firewall bootstrapping, storage configuration, and
+    shared metadata for downstream Ansible roles.
   company: homelab
   license: MIT
   min_ansible_version: "2.14"
@@ -28,6 +29,8 @@ galaxy_info:
     - baseline
     - infrastructure
 
+# Firewall is treated as a foundational safety dependency.
+# Only non-negotiable behavior is enforced here.
 dependencies:
   - role: geerlingguy.firewall
     vars:

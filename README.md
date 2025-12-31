@@ -38,10 +38,6 @@ This role follows a **deterministic, inventory-driven design** intended for long
 
   * Package upgrades with optional serial reboot handling
 
-* **ACME / Certbot Support**
-
-  * Secure deployment of DNS provider credentials
-
 * **Metadata Persistence**
 
   * Persist merged user state to `/etc/ansible/common_users.yml`
@@ -207,8 +203,6 @@ Downstream roles should treat `/etc/ansible/common_users.yml` as a **required de
 | `users`    | User and SSH configuration                  |
 | `dns`      | DNS search domains (Netplan-aware)          |
 | `timezone` | Timezone configuration                      |
-| `firewall` | Firewall rules via geerlingguy.firewall     |
 | `nfs`      | NFS mounts                                  |
 | `disks`    | Local disk formatting and mounting          |
 | `update`   | System update and serial reboot if required |
-| `acme`     | ACME DNS credentials                        |
