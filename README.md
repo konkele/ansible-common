@@ -26,8 +26,9 @@ This role follows a **deterministic, inventory-driven design** intended for long
 
 * **Firewall Management**
 
-  * Baseline TCP/UDP rules via `geerlingguy.firewall`
-  * Safe extension by downstream roles
+  * Optional baseline TCP/UDP rules via `geerlingguy.firewall`
+  * Soft dependency, enabled by default and safely disabled per host or group
+  * Safe extension by downstream roles when enabled
 
 * **Storage Management**
 
@@ -42,6 +43,21 @@ This role follows a **deterministic, inventory-driven design** intended for long
 
   * Persist merged user state to `/etc/ansible/common_users.yml`
   * Structured, human-readable YAML suitable for downstream consumption
+
+---
+
+## Firewall Behavior
+
+Firewall management is a **soft dependency**.
+
+By default, the role will include `geerlingguy.firewall`. This behavior can be disabled globally, per group, or per host.
+
+```yaml
+# Disable firewall management
+firewall_enabled: false
+```
+
+When disabled, the role **does not manage firewall state** and makes no assumptions about existing rules or providers.
 
 ---
 

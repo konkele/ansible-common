@@ -19,6 +19,13 @@
   import_tasks: disks.yml
   tags: disks
 
+- name: Include geerlingguy.firewall role if desired
+  import_role:
+    name: geerlingguy.firewall
+  vars:
+    firewall_disable_firewalld: true
+  when: firewall_enabled | default(true)
+
 - name: Update packages and reboot if needed
   import_tasks: update.yml
   tags:
