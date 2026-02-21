@@ -1,5 +1,5 @@
 ---
-- name: Apply netplan
-  command: netplan apply
-  become: yes
-  listen: Apply netplan
+- name: Restart systemd-resolved
+  service:
+    name: systemd-resolved
+    state: restarted

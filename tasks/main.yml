@@ -7,7 +7,7 @@
   import_tasks: timezone.yml
   tags: timezone
 
-- name: Configure DNS search domains (Netplan-aware)
+- name: Configure DNS search domains
   import_tasks: dns.yml
   tags: dns
 

@@ -1,35 +1,20 @@
 ---
-- name: Find Netplan YAML files
-  find:
-    paths: /etc/netplan
-    patterns: "*.yaml"
-    file_type: file
-  register: netplan_files
+- name: Ensure systemd-resolved drop-in directory exists
+  file:
+    path: /etc/systemd/resolved.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
 
-- name: Fail if no Netplan YAML found
-  fail:
-    msg: "No Netplan YAML file found in /etc/netplan!"
-  when: netplan_files.files | length == 0
-
-- name: Read Netplan YAML
-  slurp:
-    path: "{{ netplan_files.files[0].path }}"
-  register: netplan_yaml
-
-- name: Parse Netplan YAML
-  set_fact:
-    netplan_config: "{{ netplan_yaml.content | b64decode | from_yaml }}"
-
-- name: Collect interface names
-  set_fact:
-    override_interfaces: "{{ netplan_config.network.ethernets.keys() | list }}"
-
-- name: Create Netplan override file
-  template:
-    src: netplan_custom_dns.yml.j2
-    dest: /etc/netplan/99-custom-dns.yaml
+- name: Configure global DNS search domains
+  copy:
+    dest: /etc/systemd/resolved.conf.d/10-search-domains.conf
     owner: root
     group: root
     mode: '0644'
+    content: |
+      [Resolve]
+      Domains={{ common_dns_search | join(' ') }}
   when: common_dns_search | length > 0
-  notify: Apply netplan
+  notify: Restart systemd-resolved

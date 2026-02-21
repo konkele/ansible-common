@@ -22,7 +22,7 @@ This role follows a **deterministic, inventory-driven design** intended for long
 
 * **DNS Configuration**
 
-  * Configure DNS search domains (Netplan-aware)
+  * Configure DNS search domains
 
 * **Firewall Management**
 
@@ -217,7 +217,7 @@ Downstream roles should treat `/etc/ansible/common_users.yml` as a **required de
 | Tag        | Description                                 |
 | ---------- | ------------------------------------------- |
 | `users`    | User and SSH configuration                  |
-| `dns`      | DNS search domains (Netplan-aware)          |
+| `dns`      | DNS search domains                          |
 | `timezone` | Timezone configuration                      |
 | `nfs`      | NFS mounts                                  |
 | `disks`    | Local disk formatting and mounting          |
